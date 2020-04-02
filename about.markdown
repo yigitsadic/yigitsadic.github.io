@@ -4,15 +4,12 @@ title: About
 permalink: /about/
 ---
 
-This is the base Jekyll theme. You can find out more info about customizing your Jekyll theme, as well as basic Jekyll usage documentation at [jekyllrb.com](https://jekyllrb.com/)
+My name is Yiğit and I am a NestJS and Ruby on Rails developer.
+I also interested in Docker-Swarm and React.
 
-You can find the source code for Minima at GitHub:
-[jekyll][jekyll-organization] /
-[minima](https://github.com/jekyll/minima)
+I named this blog after a painting of Fikret Mualla named "Kaz" of a white goose.
+You can find this painting below:
 
-You can find the source code for Jekyll at GitHub:
-[jekyll][jekyll-organization] /
-[jekyll](https://github.com/jekyll/jekyll)
+![fikret mualla kaz]({{site.baseurl}}/assets/img/fikret-mualla-kaz.jpg)
 
-
-[jekyll-organization]: https://github.com/jekyll
+I usually write posts in Turkish and English, but vous pouvez trouver des posts en français.
