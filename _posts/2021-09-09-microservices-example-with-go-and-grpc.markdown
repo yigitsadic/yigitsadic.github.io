@@ -1,0 +1,260 @@
+---
+layout: post
+title: "Microservice example application with Docker Swarm, Golang, gRPC, GraphQL, TypeScript and React"
+date: 2021-09-08 19:30:00 +0300
+categories: docker golang grpc typescript react microservices
+---
+
+Hello, in this blog post I will create an example microservices structure using a graphql gateway API and a client written in TypeScript and React.
+
+Before start coding, let us look into drawing for basic structure:
+
+![example project structure]({{site.baseurl}}/assets/img/2021_09_09_microservices/structure.png)
+
+This project will simply login users with mock authentication data and allow them to add products to carts and create orders. I won't be using and kind of data storage for now because of I want to keep it simple.
+
+## Project Components
+
+### Auth service
+
+This service will handle login requests and respond with generated mock login info like first name, avatar.
+
+### Product service
+
+This service will serve product list.
+
+### Cart service
+
+This service will handle:
+
++ add to cart,
++ remove from cart,
++ flush cart (when order is completed)
+
+### Order service
+
+This service will handle order creations.
+
+### API Gateway
+
+This will be façade of our project. Our React application will talk with this gateway via GraphQL.
+
+### React Application
+
+This will handle all of operations and serve us graphical interface for our project.
+
+
+Let us commence!
+
+I will name this project "fake_store". You can find it on [GitHub](https://github.com/yigitsadic/fake_store)
+
+First create folder with
+
+```
+mkdir fake_store
+```
+
+Initialize Go module and touch docker-compose file.
+
+```
+go mod init github.com/yigitsadic/fake_store
+
+touch docker-compose.yml
+```
+
+I want to start with GraphQL API Gateway
+
+```
+mkdir gateway && cd gateway
+```
+
+I will use [github.com/99designs/gqlgen](https://github.com/99designs/gqlgen) for handling GraphQL server in Go.
+
+```
+go get github.com/99designs/gqlgen
+go run github.com/99designs/gqlgen init .
+```
+
+This will generate some boilerplate for our project. I took it from it's docs.
+
+```
+├── gqlgen.yml               - The gqlgen config file, knobs for controlling the generated code.
+├── graph
+│   ├── generated            - A package that only contains the generated runtime
+│   │   └── generated.go
+│   ├── model                - A package for all your graph models, generated or otherwise
+│   │   └── models_gen.go
+│   ├── resolver.go          - The root graph resolver type. This file wont get regenerated
+│   ├── schema.graphqls      - Some schema. You can split the schema into as many graphql files as you like
+│   └── schema.resolvers.go  - the resolver implementation for schema.graphql
+└── server.go                - The entry point to your app. Customize it however you see fit
+```
+
+At this point, you can use `go run ./server.go` to fire up GraphQL server. gqlgen works with schema-first principle.
+For code generation from GraphQL schema we need to run `go run github.com/99designs/gqlgen generate`. But there is a shorthand for it.
+
+Add this line to top of your `gateway/graph/resolver.go` file (this method recommended in gqlgen docs). 
+
+```go
+//go:generate go run github.com/99designs/gqlgen
+
+package graph
+
+type Resolver struct {}
+```
+
+with this piece of code we can run `go generate ./...` in our command line and generate Go code from GraphQL schema.
+
+gqlgen generates standard library compatible GraphQL server. You can use standard library http package or gorilla or chi routers. Personally I like to use [chi](https://github.com/go-chi/chi) router.
+
+To install chi you can `go get -u github.com/go-chi/chi/v5`
+
+The code generated with gqlgen init is using standard http package. Now, we'll connect chi router with gqlgen GraphQL server.
+
+We will delete generated `server.go` file and create new file under `/cmd` folder:
+
+gateway/cmd/main.go
+```go
+package main
+
+import (
+  "log"
+  "net/http"
+  "os"
+
+  "github.com/go-chi/chi/v5"
+  "github.com/99designs/gqlgen/graphql/handler"
+  "github.com/99designs/gqlgen/graphql/playground"
+)
+
+func main() {
+  port := os.Getenv("PORT")
+  if port == "" {
+    port = "3035"
+  }
+
+  srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{}}))
+
+  r := chi.NewRouter()
+
+  r.Handle("/", playground.Handler("GraphQL playground", "/query"))
+  r.Handle("/query", srv)
+
+  log.Printf("Server is up and running on port %s\n", port)
+  log.Fatal(http.ListenAndServe(":"+port, r))
+}
+```
+
+Now for testing purposes we can alter our GraphQL schema with hello world message.
+
+Edit graph/schema.graphqls file like below:
+
+```graphql
+type Query {
+  sayHello: String!
+}
+
+type LoginResponse {
+  id: ID!
+  avatar: String!
+  fullName: String!
+  token: String!
+}
+
+type Mutation {
+  login: LoginResponse!
+}
+```
+
+Remove `graph/schema.resolvers.go` file content and run `go generate ./...` for code generation. This will update files below:
+
+- graph/generated/generated.go
+- graph/models/models_gen.go
+- graph/schema.resolvers.go
+
+We'll be working with `schema.resolvers.go` file. Update your schema resolver file like this:
+
+```go
+package graph
+
+// This file will be automatically regenerated based on the schema, any resolver implementations
+// will be copied through when generating and any unknown code will be moved to the end.
+
+import (
+	"context"
+
+	"github.com/yigitsadic/fake_store/gateway/graph/generated"
+	"github.com/yigitsadic/fake_store/gateway/graph/model"
+)
+
+func (r *mutationResolver) Login(ctx context.Context) (*model.LoginResponse, error) {
+	res := model.LoginResponse{
+		ID:       "21b00554672245329aa05a4596ec09c4",
+		Avatar:   "https://avatars.dicebear.com/api/human/b9e73b73a19d4807b7fc518b0feeca24.svg",
+		FullName: "Drew Schmidt",
+		Token:    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdmF0YXIiOiJodHRwczovL2F2YXRhcnMuZGljZWJlYXIuY29tL2FwaS9odW1hbi9iOWU3M2I3M2ExOWQ0ODA3YjdmYzUxOGIwZmVlY2EyNC5zdmciLCJmdWxsTmFtZSI6IkRyZXcgU2NobWlkdCIsImV4cCI6MTY2MjczNDY5NzA0NjM4NzIwMCwianRpIjoiMjFiMDA1NTQ2NzIyNDUzMjlhYTA1YTQ1OTZlYzA5YzQiLCJpYXQiOjE2MzExOTg2OTcwNDY0MDUxMDAsImlzcyI6ImZha2Vfc3RvcmVfYXV0aCJ9.v6tYm0y7wD21G-Ec_1PMEmhnEf0WJMqdALzcWBbsX90",
+	}
+
+	return &res, nil
+}
+
+func (r *queryResolver) SayHello(ctx context.Context) (string, error) {
+	return "Hello World", nil
+}
+
+// Mutation returns generated.MutationResolver implementation.
+func (r *Resolver) Mutation() generated.MutationResolver { return &mutationResolver{r} }
+
+// Query returns generated.QueryResolver implementation.
+func (r *Resolver) Query() generated.QueryResolver { return &queryResolver{r} }
+
+type mutationResolver struct{ *Resolver }
+type queryResolver struct{ *Resolver }
+```
+
+Now we're ready to test our changes. In gateway folder run `go run ./cmd` and open [localhost:3035](http://localhost:3035) at your browser.
+
+First fire up a query:
+
+![first_query]({{site.baseurl}}/assets/img/2021_09_09_microservices/first_query.png)
+
+And moment of truth. Let's try login mutation:
+
+![first_mutation]({{site.baseurl}}/assets/img/2021_09_09_microservices/first_mutation.png)
+
+We have successfully implemented basic GraphQL server in Go!
+
+Let's move to Auth Service!
+
+## Auth Service
+
+Root of your project folder, create new folder and initialize with proto file.
+
+```
+mkdir auth && cd auth
+touch auth.proto
+```
+
+For protobuf you can visit [https://developers.google.com/protocol-buffers.](https://developers.google.com/protocol-buffers)
+
+Update `auth.proto` file with:
+
+```proto
+syntax = "proto3";
+package auth;
+
+option go_package = "client/client";
+
+message AuthRequest {}
+
+message UserResponse {
+  string id = 1;
+  string avatar = 2;
+  string fullName = 3;
+  string jwtToken = 4;
+}
+
+service AuthService {
+  rpc LoginUser(AuthRequest) returns (UserResponse) {}
+}
+```
