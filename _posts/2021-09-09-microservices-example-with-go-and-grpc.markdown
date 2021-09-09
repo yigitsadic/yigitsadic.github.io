@@ -258,3 +258,280 @@ service AuthService {
   rpc LoginUser(AuthRequest) returns (UserResponse) {}
 }
 ```
+
+For generate gRPC client and server generation we first need to install 
+
+```
+go install google.golang.org/protobuf/cmd/protoc-gen-go@v1.26
+go install google.golang.org/grpc/cmd/protoc-gen-go-grpc@v1.1
+```
+
+```
+protoc --go_out=. --go-grpc_out=. auth.proto
+```
+
+It will generate two files which contains models, client and server.
+```
+auth
+  client
+    client
+      auth.pb.go
+      auth_grpc.pb.go
+```
+
+In order to communicate using gRPC we need a server. Create a file named "auth/cmd/main.go"
+
+I will use [faker](https://github.com/bxcodec/faker) package for random data generation. Install faker with `go get -u github.com/bxcodec/faker/v3`
+
+For avatars I will use [dicebear](https://avatars.dicebear.com/) project. It gives you consistent random pretty avatars.
+For generating JWT tokens, we need to install [github.com/dgrijalva/jwt-go](https://github.com/dgrijalva/jwt-go) with `go get -u github.com/dgrijalva/jwt-go`
+
+Let's code JWT generation and gRPC server.
+
+Create auth/cmd/jwt_token.go and insert codes below:
+
+```go
+package main
+
+import (
+	"github.com/dgrijalva/jwt-go"
+	"time"
+)
+
+type Claims struct {
+	Avatar   string `json:"avatar"`
+	FullName string `json:"fullName"`
+	jwt.StandardClaims
+}
+
+func GenerateJWTToken(id, avatar, fullName string) string {
+	c := Claims{
+		Avatar:   avatar,
+		FullName: fullName,
+		StandardClaims: jwt.StandardClaims{
+			ExpiresAt: time.Now().AddDate(1, 0, 0).UnixNano(),
+			Id:        id,
+			IssuedAt:  time.Now().UnixNano(),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, c)
+	ss, _ := token.SignedString([]byte("FAKE_STORE_AUTH"))
+
+	return ss
+}
+```
+
+And for the auth/cmd/main.go file we're basicly initializing the most basic gRPC server:
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"github.com/bxcodec/faker/v3"
+	"github.com/yigitsadic/fake_store/auth/client/client"
+	"google.golang.org/grpc"
+	"log"
+	"net"
+)
+
+const DiceBearUrl = "https://avatars.dicebear.com/api/human/%s.svg"
+
+type Server struct {
+	client.UnimplementedAuthServiceServer
+}
+
+func (s *Server) LoginUser(context.Context, *client.AuthRequest) (*client.UserResponse, error) {
+	resp := client.UserResponse{
+		Id:       faker.UUIDDigit(),
+		Avatar:   fmt.Sprintf(DiceBearUrl, faker.UUIDDigit()),
+		FullName: faker.FirstName() + " " + faker.LastName(),
+	}
+	resp.JwtToken = GenerateJWTToken(resp.Id, resp.Avatar, resp.FullName)
+
+	return &resp, nil
+}
+
+func main() {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", 9000))
+	if err != nil {
+		log.Fatalf("failed to listen: %v\n", err)
+	}
+
+	grpcServer := grpc.NewServer()
+	s := Server{}
+
+	client.RegisterAuthServiceServer(grpcServer, &s)
+
+	log.Println("Started to serve auth grpc")
+	if err := grpcServer.Serve(lis); err != nil {
+		log.Fatalf("failed to serve due to %s\n", err)
+	}
+}
+```
+
+Our auth package almost ready. But we need to containerize it. Let's create Dockerfile.
+
+```docker
+FROM golang:1.17.0-alpine3.13 as compiler
+
+WORKDIR /src/app
+
+COPY go.mod go.sum ./
+
+COPY auth auth
+
+RUN go build -o auth_service ./auth/cmd/
+
+FROM alpine:3.13
+
+WORKDIR /src
+
+COPY --from=compiler /src/app/auth_service /src/app
+CMD ["/src/app"]
+```
+
+I created two-stepped dockerfile. At first step we compile our executable go code. At second step we run our executable in alpine image.
+
+At this step our auth service is fullfil it's goals. It returns fake full-name along with a jwt token. I won't implement real auth logic and database operations here (sign-up, sign-in, verify password etc.)
+
+## Connecting auth service from gateway
+
+Let's import and use our gRPC client from gateway. That's the ease of protobuf and gRPC. Let's return to `gateway` folder.
+
+gqlgen package tells us to we can use `Resolver` struct as a dependency injection purposes. I extend `gateway/graph/resolver.go` like below.
+
+```go
+//go:generate go run github.com/99designs/gqlgen
+
+package graph
+
+import "github.com/yigitsadic/fake_store/auth/client/client" // <- I am using client which generated from protobuf file.
+
+type Resolver struct {
+	AuthClient client.AuthServiceClient // <- AuthClient will be gRPC client to interact with auth service
+}
+```
+
+Update `gateway/graph/schema.resolvers.go` for gRPC client use like below:
+
+```go
+// ...
+
+func (r *mutationResolver) Login(ctx context.Context) (*model.LoginResponse, error) {
+  // Make request to auth service
+	result, err := r.AuthClient.LoginUser(ctx, &client.AuthRequest{})
+	if err != nil {
+		return nil, err
+	}
+
+  // Convert response into model.LoginResponse struct
+	res := model.LoginResponse{
+		ID:       result.Id,
+		Avatar:   result.Avatar,
+		FullName: result.FullName,
+		Token:    result.JwtToken,
+	}
+
+	return &res, nil
+}
+
+// ...
+```
+
+From this point we connected resolver and we need to pass auth service client into resolver struct at initialization of GraphQL server.
+
+Add client and connection generation function to main.go
+
+```go
+
+// gateway/cmd/main.go
+
+func acquireAuthConnection() (*grpc.ClientConn, client.AuthServiceClient) {
+	conn, err := grpc.Dial("auth:9000", grpc.WithInsecure(), grpc.WithBlock()) // auth:9000 We will be using docker-compose.
+	if err != nil {
+		log.Fatalln("Unable to acquire auth connection")
+	}
+
+	c := client.NewAuthServiceClient(conn)
+
+	return conn, c
+}
+```
+
+Let's update rest of `main.go` file.
+
+```go
+// package, import etc.
+
+func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "3035"
+	}
+
+  // acquire connection and pass resolver as dependency injection.
+	authConnection, authClient := acquireAuthConnection()
+	defer authConnection.Close()
+
+	resolver := graph.Resolver{
+		AuthClient: authClient,
+	}
+
+	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolver}))
+
+// Rest of code
+```
+
+Let's continue with Dockerfile.
+
+Create Dockerfile with content:
+
+```
+FROM golang:1.17.0-alpine3.13 as compiler
+
+WORKDIR /src/app
+
+COPY go.mod go.sum ./
+
+COPY gateway gateway
+# We need this for access auth gRPC client
+COPY auth auth
+
+RUN go build -o gateway_service ./gateway/cmd/
+
+FROM alpine:3.13
+
+WORKDIR /src
+
+COPY --from=compiler /src/app/gateway_service /src/app
+CMD ["/src/app"]
+
+```
+
+Continue with docker-compose.yml file
+
+```yaml
+version: "3.3"
+
+services:
+  gateway:
+    build:
+      context: .
+      dockerfile: ./gateway/Dockerfile
+    ports:
+      - "3035:3035"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3035/readiness" ]
+      interval: 200s
+      timeout: 200s
+      retries: 5
+  auth:
+    build:
+      context: .
+      dockerfile: ./auth/Dockerfile
+```
+
+The moment of truth. Run `docker-compose up`
