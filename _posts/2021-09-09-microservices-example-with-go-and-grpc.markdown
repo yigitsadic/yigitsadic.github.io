@@ -523,11 +523,6 @@ services:
       dockerfile: ./gateway/Dockerfile
     ports:
       - "3035:3035"
-    healthcheck:
-      test: [ "CMD", "curl", "-f", "http://localhost:3035/readiness" ]
-      interval: 200s
-      timeout: 200s
-      retries: 5
   auth:
     build:
       context: .
