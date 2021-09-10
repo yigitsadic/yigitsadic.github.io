@@ -608,7 +608,101 @@ The final step is refer `AuthArea` component in `NavBar` component.
 
 ## Integrating with gateway via GraphQL
 
-TODO
+I will use code generation tool for creating hooks for queries and mutations.
+
+```
+yarn add -D @graphql-codegen/cli @graphql-codegen/typescript @graphql-codegen/typescript-operations @graphql-codegen/typescript-react-apollo @types/graphql
+yarn add graphql @apollo/client
+```
+
+Create config file for codegen named `codegen.yml`
+
+```yaml
+overwrite: true
+schema: "http://localhost:3035/query"
+documents: "./src/components/**/*.{ts,tsx}"
+generates:
+  ./src/generated/graphql.tsx:
+    plugins:
+      - "typescript"
+      - "typescript-operations"
+      - "typescript-react-apollo"
+    config:
+      withHooks: true
+```
+
+For schema introspection we need to fire-up gateway service via `docker-compose up`
+
+codegen will look for /src/components sub directories and files. Let's create first mutation.
+
+```typescript
+// src/components/nav-bar/auth-area/mutation.ts
+
+import { gql } from '@apollo/client';
+
+export const LOGIN_MUTATION = gql`
+    mutation login {
+        login {
+            id
+            avatar
+            fullName
+            token
+        }
+    }
+`;
+```
+
+Add code below to package.json file
+```json
+  "scripts": {
+    "start": "webpack serve",
+    "build": "webpack",
+    "codegen": "graphql-codegen --config codegen.yml"
+  }
+```
+
+And run `yarn run codegen` and voilà ! We generated GraphQL hooks in TypeScript.
+
+Let's use them in `Unauthenticated` component. Final form will look like this:
+
+```typescript
+import React from "react";
+import {useLoginMutation} from "../../../generated/graphql";
+import {login} from "../../../store/auth/auth";
+import {useAppDispatch} from "../../../store/hooks";
+
+const Unauthenticated: React.FC = () => {
+    const dispatch = useAppDispatch();
+    const [loginUser, {data, loading, error}] = useLoginMutation();
+
+    if (data) {
+        dispatch(login({
+            id: data.login.id,
+            fullName: data.login.fullName,
+            avatar: data.login.avatar,
+            loggedIn: true,
+        }));
+    }
+
+    return <>
+        <button
+            type="button"
+            className="btn btn-outline-success"
+            onClick={() => loginUser()}
+            disabled={loading}
+        >
+            {error ? "Error occurred - Retry" : (loading ? "Loading..." : "Login")}
+        </button>
+    </>;
+};
+
+export default Unauthenticated;
+```
+
+That's it. We connected React app into GraphQL server with generated hooks.
+
+![error_state]({{site.baseurl}}/assets/img/2021_09_09_microservices/err.gif)
+![successful]({{site.baseurl}}/assets/img/2021_09_09_microservices/suc.gif)
 
 ## Containerization
 
