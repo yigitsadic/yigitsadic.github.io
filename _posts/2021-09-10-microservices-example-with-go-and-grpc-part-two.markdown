@@ -195,15 +195,416 @@ Great success. We successfully connected TypeScript, React and webpack.
 
 ## Installing bootstrap
 
-TODO
+I decided to use Bootsrap 5 in this project. To install, run: `yarn add bootstrap` In your `src/index.tsx` file add import to top:
+
+```typescript
+
+import React from "react";
+import ReactDOM from "react-dom";
+import App from "./App";
+
+import 'bootstrap/dist/css/bootstrap.min.css';
+
+// ...
+```
+
+In `App.tsx` file let's add CSS class to main div:
+
+```typescript
+import React from "react";
+
+const App: React.FC = () => {
+    return (
+        <div className="container-fluid">
+            Hello World
+        </div>
+    );
+};
+
+export default App;
+```
+
+Create `src/components/nav-bar/NavBar.tsx` file for navigation.
+
+```typescript
+import React from "react";
+import Links from "./Links";
+import AuthArea from "./auth-area/AuthArea";
+
+const NavBar: React.FC = () => {
+    return (
+        <nav className="navbar navbar-expand-md navbar-dark bg-dark mb-4">
+            <div className="container-fluid">
+                <a href="/" className="navbar-brand">Fake Store</a>
+
+                <button className="navbar-toggler" type="button" data-bs-toggle="collapse"
+                        data-bs-target="#navbarCollapse" aria-controls="navbarCollapse" aria-expanded="false"
+                        aria-label="Toggle navigation">
+                    <span className="navbar-toggler-icon"></span>
+                </button>
+                <div className="collapse navbar-collapse" id="navbarCollapse">
+                    <Links />
+                </div>
+            </div>
+        </nav>
+    );
+};
+
+export default NavBar;
+```
+
+We used Links component which is not defined at this moment. Continue with defining them:
+
+
+```typescript
+// src/components/nav-bar/Links.tsx
+
+import React from "react";
+
+const Links: React.FC = () => {
+    return (
+        <ul className="navbar-nav me-auto mb-2 mb-md-0">
+            <li className="nav-item">
+                <a href="/products" className="nav-link">Products</a>
+            </li>
+
+            <li className="nav-item">
+                <a href="/orders" className="nav-link">Orders</a>
+            </li>
+
+            <li className="nav-item">
+                <a href="/cart" className="nav-link">Cart</a>
+            </li>
+        </ul>
+    )
+};
+
+export default Links;
+```
+
+We basicly connected Bootstrap to our React application. Next step we'll connect React router. Let's go.
 
 ## Handling page routing
 
-TODO
+Let's start by installing `yarn add react-router-dom`. We need to set a provider top of component:
+
+In `src/index.tsx` wrap <App /> with `BrowserRouter` component.
+```typescript
+import React from "react";
+import ReactDOM from "react-dom";
+import App from "./App";
+
+import 'bootstrap/dist/css/bootstrap.min.css';
+import {BrowserRouter} from "react-router-dom";
+
+ReactDOM.render(
+    <React.StrictMode>
+      <BrowserRouter>
+          <App />
+      </BrowserRouter>
+    </React.StrictMode>,
+    document.getElementById("root")
+);
+```
+
+We need to provide routes in our `src/App.tsx` file like below:
+
+```typescript
+import React from "react";
+import NavBar from "./components/nav-bar/NavBar";
+import {Route, Switch} from "react-router-dom";
+
+const App: React.FC = () => {
+    return (
+        <>
+            <NavBar />
+
+            <div className="container-fluid">
+                <Switch>
+                    <Route path="/products">
+                        Products
+                    </Route>
+
+                    <Route path="/orders">
+                        Orders
+                    </Route>
+
+                    <Route path="/cart">
+                        Cart
+                    </Route>
+
+                    <Route path="/">
+                        Home
+                    </Route>
+                </Switch>
+            </div>
+        </>
+    );
+};
+
+export default App;
+```
+
+Let's convert anchor tags to <Link> components in files:
+
+* components/NavBar.tsx
+* components/Links.tsx
+
+```typescript
+// Links.tsx
+import React from "react";
+
+import  { Link } from "react-router-dom";
+
+const Links: React.FC = () => {
+    return (
+        <ul className="navbar-nav me-auto mb-2 mb-md-0">
+            <li className="nav-item">
+                <Link to="/products" className="nav-link">Products</Link>
+            </li>
+
+            <li className="nav-item">
+                <Link to="/orders" className="nav-link">Orders</Link>
+            </li>
+
+            <li className="nav-item">
+                <Link to="/cart" className="nav-link">Cart</Link>
+            </li>
+        </ul>
+    )
+};
+
+export default Links;
+```
+
+```typescript
+// ..
+<Link to="/" className="navbar-brand">Fake Store</Link>
+// rest of code
+```
+
+Routing is completed at this moment. Let's integrate react-redux in order to handle states which is we need for authentication and cart managemennt.
 
 ## Installing react-redux
 
-TODO
+```
+yarn add -D @types/react-redux
+yarn add @reduxjs/toolkit react-redux
+```
+
+We will use react-redux via hooks. I will create auth store handler now but first let's create store folder structure below:
+
+```
+app/
+  store/
+    hooks.ts
+    store.ts
+    auth/
+      auth.ts
+      user.ts
+```
+
+Let's create user interface first in `store/auth/user.ts`
+
+```typescript
+export interface User {
+    id?: string;
+    avatar?: string;
+    fullName?: string;
+
+    loggedIn: boolean;
+}
+```
+
+Let's continue with reducers and selector:
+
+```typescript
+// store/auth/auth.ts
+
+import { createSlice, PayloadAction } from '@reduxjs/toolkit';
+import {User} from "./user";
+import {RootState} from "../store";
+
+export interface AuthState {
+    user: User,
+}
+
+const initialState: AuthState = {
+    user: {
+        loggedIn: false,
+    },
+};
+
+export const authSlice = createSlice({
+    name: "auth-handler",
+    initialState,
+    reducers: {
+        login: (state, action: PayloadAction<User>) => {
+            state.user = action.payload;
+        },
+        logout: (state) => {
+            state.user = { loggedIn: false };
+        },
+    },
+});
+
+export const { login, logout } = authSlice.actions;
+export const selectedCurrentUser = (state: RootState) => state.auth.user;
+
+export default authSlice.reducer;
+
+```
+
+Let's define hooks:
+
+```typescript
+// store/hooks.ts
+
+import { TypedUseSelectorHook, useDispatch, useSelector } from 'react-redux';
+import type { RootState, AppDispatch } from './store';
+
+export const useAppDispatch = () => useDispatch<AppDispatch>();
+export const useAppSelector: TypedUseSelectorHook<RootState> = useSelector;
+```
+
+Let's finish with store.ts:
+
+```typescript
+// store/store.ts
+
+import { configureStore } from '@reduxjs/toolkit';
+import authReducer from "./auth/auth";
+
+export const store = configureStore({
+    reducer: {
+        auth: authReducer,
+    },
+});
+
+export type AppDispatch = typeof store.dispatch;
+export type RootState = ReturnType<typeof store.getState>;
+```
+
+Our store/ folder is ready, the final step is connect it via store provider in `index.tsx` file:
+
+```typescript
+// imports
+import {Provider} from "react-redux";
+import {store} from "./store/store";
+// imports
+
+ReactDOM.render(
+    <React.StrictMode>
+        <Provider store={store}> // react-redux provider
+            <BrowserRouter>
+                <App />
+            </BrowserRouter>
+        </Provider>
+    </React.StrictMode>,
+    document.getElementById("root")
+);
+```
+
+Integration finished. I will add login/logout switch right now.
+
+In `src/components/nav-bar` folder create `auth-area` with following files:
+
+```
+- AuthArea.tsx
+- AuthenticatedUser.tsx
+- Unauthenticated.tsx
+```
+
+Let's start with `AuthArea.tsx`. This component will be root point for handling login & logout operations.
+
+```typescript
+// src/components/nav-bar/auth-area/AuthArea.tsx
+import React from "react";
+import AuthenticatedUser from "./AuthenticatedUser";
+import Unauthenticated from "./Unauthenticated";
+import {useAppSelector} from "../../../store/hooks";
+import {selectedCurrentUser} from "../../../store/auth/auth";
+
+const AuthArea: React.FC = () => {
+    const { loggedIn } = useAppSelector(selectedCurrentUser);
+
+    return loggedIn ? <AuthenticatedUser /> :  <Unauthenticated />;
+}
+
+export default AuthArea;
+```
+
+Continue with `Authenticated.tsx`
+
+```typescript
+import React from "react";
+import {logout, selectedCurrentUser} from "../../../store/auth/auth";
+import {useAppDispatch, useAppSelector} from "../../../store/hooks";
+
+const AuthenticatedUser: React.FC = () => {
+    const dispatch = useAppDispatch();
+    const currentUser = useAppSelector(selectedCurrentUser);
+
+    return <>
+        <button type="button" className="btn btn-primary position-relative">
+            <img src={currentUser?.avatar} width="20px" height="20px" /> &nbsp;&nbsp;
+            {currentUser?.fullName}
+        </button>
+
+        <button type="button"
+                className="btn btn-danger position-relative"
+                onClick={() => dispatch(logout())}>
+            Logout
+        </button>
+    </>;
+}
+
+export default AuthenticatedUser;
+```
+
+Let's move into `Unauthenticated.tsx`
+
+```typescript
+import React from "react";
+import {login} from "../../../store/auth/auth";
+import {useAppDispatch} from "../../../store/hooks";
+
+const Unauthenticated: React.FC = () => {
+    const dispatch = useAppDispatch();
+
+    return <>
+        <button
+            type="button"
+            className="btn btn-outline-success"
+            onClick={() => {
+                dispatch(login({
+                    id: "1231231",
+                    fullName: "Georges Brassens",
+                    avatar: "georges-brassens.svg",
+                    loggedIn: true,
+                }));
+            }}
+        >
+            Login
+        </button>
+    </>;
+};
+
+export default Unauthenticated;
+```
+
+The final step is refer `AuthArea` component in `NavBar` component.
+
+```typescript
+// .. rest of src/nav-bar/NavBar.tsx file
+
+<div className="collapse navbar-collapse" id="navbarCollapse">
+    <Links />
+    <AuthArea />
+</div>
+
+// .. rest of src/nav-bar/NavBar.tsx file
+```
 
 ## Integrating with gateway via GraphQL
 
@@ -269,6 +670,6 @@ services:
 
 ## What's next?
 
-I will cover creation of products service and connecting it with gateway service and React app on part III.
+I will cover creation of products service and connecting it with gateway service and React app on [part III](https://yigitsadic.github.io/docker/golang/grpc/typescript/react/microservices/2021/09/16/microservices-example-with-go-and-grpc-part-three.html).
 
 À la prochaine !
