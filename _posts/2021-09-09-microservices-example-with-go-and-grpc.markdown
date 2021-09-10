@@ -547,6 +547,6 @@ The moment of truth. Run `docker-compose up`
 
 ## What's next?
 
-I will cover React app installation on part II.
+I will cover React app installation on [part II](https://yigitsadic.github.io/docker/golang/grpc/typescript/react/microservices/2021/09/09/microservices-example-with-go-and-grpc-part-two.html).
 
 À la prochaine !
