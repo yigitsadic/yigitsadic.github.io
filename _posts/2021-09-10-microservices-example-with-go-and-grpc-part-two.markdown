@@ -699,6 +699,37 @@ const Unauthenticated: React.FC = () => {
 export default Unauthenticated;
 ```
 
+We need to set provider for GraphQL server at `index.tsx` file.
+```typescript
+import React from "react";
+import ReactDOM from "react-dom";
+import App from "./App";
+
+import 'bootstrap/dist/css/bootstrap.min.css';
+import {ApolloClient, ApolloProvider, InMemoryCache} from "@apollo/client";
+import {Provider} from "react-redux";
+import {BrowserRouter} from "react-router-dom";
+import {store} from "./store/store";
+
+const client = new ApolloClient({
+    uri: 'http://localhost:3035/query',
+    cache: new InMemoryCache(),
+});
+
+ReactDOM.render(
+    <React.StrictMode>
+        <Provider store={store}>
+            <ApolloProvider client={client}>
+                <BrowserRouter>
+                    <App />
+                </BrowserRouter>
+            </ApolloProvider>
+        </Provider>
+    </React.StrictMode>,
+    document.getElementById("root")
+);
+```
+
 That's it. We connected React app into GraphQL server with generated hooks.
 
 ![error_state]({{site.baseurl}}/assets/img/2021_09_09_microservices/err.gif)
