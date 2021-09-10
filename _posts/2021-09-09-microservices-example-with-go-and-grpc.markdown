@@ -129,6 +129,7 @@ import (
   "os"
 
   "github.com/go-chi/chi/v5"
+  "github.com/go-chi/chi/v5/middleware"
   "github.com/99designs/gqlgen/graphql/handler"
   "github.com/99designs/gqlgen/graphql/playground"
 )
@@ -143,6 +144,8 @@ func main() {
 
   r := chi.NewRouter()
 
+  r.Use(middleware.Heartbeat("/readiness")) // for healthcheck
+  
   r.Handle("/", playground.Handler("GraphQL playground", "/query"))
   r.Handle("/query", srv)
 
@@ -529,6 +532,11 @@ services:
       dockerfile: ./gateway/Dockerfile
     ports:
       - "3035:3035"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:3035/readiness" ]
+      interval: 200s
+      timeout: 200s
+      retries: 5
   auth:
     build:
       context: .
