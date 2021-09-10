@@ -113,14 +113,14 @@ with this piece of code we can run `go generate ./...` in our command line and g
 
 gqlgen generates standard library compatible GraphQL server. You can use standard library http package or gorilla or chi routers. Personally I like to use [chi](https://github.com/go-chi/chi) router.
 
-To install chi you can `go get -u github.com/go-chi/chi/v5`
+To install chi you can `go get -u github.com/go-chi/chi/v5` and for CORS `go get -u github.com/rs/cors`
 
 The code generated with gqlgen init is using standard http package. Now, we'll connect chi router with gqlgen GraphQL server.
 
 We will delete generated `server.go` file and create new file under `/cmd` folder:
 
-gateway/cmd/main.go
 ```go
+// gateway/cmd/main.go
 package main
 
 import (
@@ -132,6 +132,7 @@ import (
   "github.com/go-chi/chi/v5/middleware"
   "github.com/99designs/gqlgen/graphql/handler"
   "github.com/99designs/gqlgen/graphql/playground"
+  "github.com/rs/cors"
 )
 
 func main() {
@@ -143,7 +144,11 @@ func main() {
   srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &graph.Resolver{}}))
 
   r := chi.NewRouter()
-
+	r.Use(cors.New(cors.Options{
+		AllowedOrigins:   []string{"*"},
+		AllowCredentials: true,
+		Debug:            true,
+	}).Handler)
   r.Use(middleware.Heartbeat("/readiness")) // for healthcheck
   
   r.Handle("/", playground.Handler("GraphQL playground", "/query"))
