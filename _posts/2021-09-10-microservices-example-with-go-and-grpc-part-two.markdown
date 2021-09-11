@@ -2,7 +2,7 @@
 layout: post
 title: "Microservice example application with Docker Swarm, Golang, gRPC, GraphQL, TypeScript and React - Part II"
 date: 2021-09-09 19:30:00 +0300
-categories: docker golang grpc typescript react microservices
+tags: docker golang grpc typescript react microservices
 ---
 
 > This post will cover creation of React app creation, installation of dependencies and logging via GraphQL.
