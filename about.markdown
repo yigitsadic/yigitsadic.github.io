@@ -4,6 +4,8 @@ title: About
 permalink: /about/
 ---
 
+![me]({{site.baseurl}}/assets/img/profile.jpeg)
+
 Hello, this is Yigit 🖖
 
 I'm a backend developer who's always looking to learn and improve.
@@ -16,7 +18,7 @@ Sauf de l'anglais et de ma langue maternelle je peux aussi parler français.
 
 You can contact me via [my LinkedIn account](www.linkedin.com/in/yiğit-sadıç-25563aa6).
 
-I usually write posts in Turkish and English, but vous pouvez trouver des posts en français.
+I usually write posts in Turkish and English, mais vous pouvez aussi trouver des posts en français.
 
 I named this blog after a painting of Fikret Mualla named "Kaz" of a white goose.
 You can find this painting below:
