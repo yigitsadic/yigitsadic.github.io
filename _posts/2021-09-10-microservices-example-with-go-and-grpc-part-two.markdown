@@ -795,6 +795,7 @@ services:
 
 ## What's next?
 
-I will cover creation of products service and connecting it with gateway service and React app on [part III]({% post_url 2021-09-11-microservices-example-with-go-and-grpc-part-three %})
+I will cover creation of products service and connecting it with gateway service and React app on
+[part III]({% post_url 2021-09-11-microservices-example-with-go-and-grpc-part-three %})
 
 À la prochaine !
