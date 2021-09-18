@@ -742,10 +742,23 @@ app_1       |  └────────────────────�
 app_1       | 
 ```
 
-Let's `curl http://localhost:3035`
+Let's `curl http://localhost:3035 | jq`
 
 ```json
-[{"full_name":"John Doe"},{"full_name":"Aida Bugg"},{"full_name":"Maureen Biologist"},{"full_name":"Allie Grater"}]
+[
+  {
+    "full_name": "John Doe"
+  },
+  {
+    "full_name": "Aida Bugg"
+  },
+  {
+    "full_name": "Maureen Biologist"
+  },
+  {
+    "full_name": "Allie Grater"
+  }
+]
 ```
 
 Everything seems to be OK.
